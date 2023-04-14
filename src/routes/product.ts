@@ -1,83 +1,109 @@
 import express from "express";
-import { body } from "express-validator";
+import { body, header, param, query } from "express-validator";
 import { Product } from "../models/productSchema";
 import { checkErrors, isAuth } from "./utils";
 
 const router = express.Router();
 
-export type Product = {
-    _id: string;
-    brand: string,
-    model: string,
-    car_model_year: number,
-    price: number,
-};
-
-router.get('/products', async (_, res) => {
-    res.json(await Product.find())
-});
-
 router.post(
-    '/products',
-    body('brand').notEmpty(),
-    body('model').notEmpty(),
-    body('car_model_year').notEmpty().isLength({ min: 4, max: 4 }),
-    body('price').notEmpty(),
-    isAuth,
-    checkErrors,
-    async (req, res) => {
-        const { brand, model, car_model_year, price } = req.body;
-        const product = new Product({
-            brand,
-            model,
-            car_model_year,
-            price,
-        });
-        //Adds document to collection
-        const response = await product.save();
-        res.status(201).json({
-            message: "Product Inserted",
-            id: response._id,
-            brand: product.brand,
-            model: product.model,
-            car_model_year: product.car_model_year,
-            price: product.price,
-        });
-    }
+  "/",
+  header("authorization").isJWT(),
+  body("brand").exists().isString(),
+  body("model").exists().isString(),
+  body("car_model_year").exists().isLength({ min: 4, max: 4 }).isNumeric(),
+  body("price").exists().isNumeric(),
+  checkErrors,
+  isAuth,
+  async (req, res) => {
+    const { brand, model, car_model_year, price } = req.body;
+    const product = new Product({
+      brand,
+      model,
+      car_model_year,
+      price,
+    });
+    //Adds document to collection
+    const productSaved = await product.save();
+    res.status(201).json({
+      message: "Product Inserted",
+      productSaved,
+    });
+  }
 );
 
 router.put(
-    '/products/:_id',
-    isAuth,
-    checkErrors,
-    async (req, res) => {
-        const { brand, model, car_model_year, price } = req.body;
-        const productFinder = await Product.findByIdAndUpdate(req.params._id, { brand: brand, model: model, car_model_year: car_model_year, price: price })
-        if (productFinder) {
-            const product = new Product({
-                brand,
-                model,
-                car_model_year,
-                price
-            })
-            //Edit document to collection
-            res.status(201).json({ message: "product updated", product });
-        }
-        else {
-            return res.status(404).json({ message: "product not found" })
-        }
+  "/:id",
+  header("authorization").isJWT(),
+  param("id").isMongoId(),
+  body("brand").exists().optional().isString(),
+  body("model").exists().optional().isString(),
+  body("car_model_year")
+    .optional()
+    .exists()
+    .isLength({ min: 4, max: 4 })
+    .isNumeric(),
+  body("price").optional().exists().isNumeric(),
+  checkErrors,
+  isAuth,
+  async (req, res) => {
+    const { id } = req.params;
+    const { brand, model, car_model_year, price } = req.body;
+    const productFinder = await Product.findByIdAndUpdate(id, {
+      brand: brand,
+      model: model,
+      car_model_year: car_model_year,
+      price: price,
+    });
+    if (!productFinder) {
+      return res.status(404).json({ message: "product not found" });
+    } else {
+      const product = new Product({
+        brand,
+        model,
+        car_model_year,
+        price,
+      });
+      //Edit document to collection
+      res.status(201).json({ message: "product updated", product });
     }
+  }
 );
 
 router.delete(
-    '/products/:_id',
-    isAuth,
-    checkErrors,
-    async (req, res) => {
-        const productDeleted = await Product.findByIdAndDelete(req.params._id);
-        productDeleted ? res.status(201).json({ message: "product delete", productDeleted })
-            : res.status(404).json({ message: "product not found" })
-    }
+  "/:id",
+  header("authorization").isJWT(),
+  param("id").isMongoId(),
+  checkErrors,
+  isAuth,
+  async (req, res) => {
+    const { id } = req.params;
+    const productDeleted = await Product.findByIdAndDelete(id);
+    productDeleted
+      ? res.status(201).json({ message: "product delete", productDeleted })
+      : res.status(404).json({ message: "product not found" });
+  }
 );
+
+router.get(
+  "/",
+  query("brand").optional().isString(),
+  query("model").optional().isString(),
+  query("car_model_year").optional().isNumeric(),
+  query("price").optional().isLength({ min: 4, max: 4 }).isNumeric(),
+  checkErrors,
+  async (req, res) => {
+    const products = await Product.find({ ...req.query });
+    res.json(products);
+  }
+);
+
+router.get("/:id", param("id").isMongoId(), checkErrors, async (req, res) => {
+  const { id } = req.params;
+  const product = await Product.findById(id);
+  if (!product) {
+    return res.status(404).json({ message: "product not found" });
+  }
+  res.json(product);
+});
 
 export default router;

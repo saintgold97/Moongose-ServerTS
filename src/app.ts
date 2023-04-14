@@ -6,7 +6,7 @@ import product from "./routes/product";
 app.use(express.json());
 
 app.use("/v1/auth", auth);
-app.use("/v1", product);
+app.use("/v1/products", product);
 
 //SERVER
 app.listen(process.env.PORT || 3001, async () => {

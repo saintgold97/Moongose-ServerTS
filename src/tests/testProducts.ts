@@ -2,180 +2,242 @@ import request from "supertest";
 require("chai").should();
 import bcrypt from "bcrypt";
 import { app } from "../app";
-import { Product as productSchema } from "../models/productSchema";
-import { v4 } from "uuid";
-import { assert } from "chai";
-import mongoose from "mongoose";
-import { isAuth } from "../routes/utils";
+import { Product} from "../models/productSchema";
 import { User as userSchema } from "../models/user";
 import { saltRounds } from "../routes/auth";
+import jwt from "jsonwebtoken";
+const jwtToken = "shhhhhhh";
 
-const baseAuth = "/v1";
+const basicUrl = "/v1/products";
 
-describe('endpoints', () => {
-    /* const user = {
-        name: "Carlo",
-        surname: "Leonardi",
-        email: "carloleonard83@gmail.com",
-        password: "testtest",
-    }; */
-    const product = {
-        _id: new mongoose.Types.ObjectId(),
-        brand: "Fiat",
-        model: "Punto",
-        car_model_year: 1996,
-        price: 1000,
-    };
+describe("products", () => {
+  const product = {
+    brand: "Fiat",
+    model: "Punto",
+    car_model_year: 1996,
+    price: 1000,
+  };
+  const user = {
+    name: "Carlo",
+    surname: "Leonardi",
+    email: "carloleonard83@gmail.com",
+    password: "testtest",
+  };
+  let token: string;
+  before(async () => {
+    const newUser = new userSchema({
+      name: user.name,
+      surname: user.surname,
+      email: user.email,
+      password: await bcrypt.hash(user.password, saltRounds),
+    });
+    await newUser.save();
+    token = jwt.sign(
+      {
+        id: newUser._id,
+        email: newUser.email,
+        name: newUser.name,
+        surname: newUser.surname,
+      },
+      jwtToken
+    );
+    console.log("token:", token);
+  });
+  after(async () => {
+    await userSchema.findOneAndDelete({ email: user.email });
+  });
 
-    /* describe("user UNATHORIZED", () => {
-        before(async () => {
-            const newUser = new userSchema({
-                name: user.name,
-                surname: user.surname,
-                email: user.email,
-                password: await bcrypt.hash(user.password, saltRounds),
-                verify: v4(),
-            });
-            await newUser.save();
-        });
-        after(async () => {
-            await userSchema.findOneAndDelete({ email: user.email });
-        });
-        it("test 401 UNATHORIZED", async () => {
-            const { status } = await request(app)
-                .post(`${baseAuth}/login`)
-                .send({ email: user.email, password: user.password });
-            status.should.be.equal(401);
-        });
-    }); */
+  describe.only("create product", () => {
+    let id: string;
+    after(async () => {
+      await Product.findByIdAndDelete(id);
+    });
+    it("test 401 UNATHORIZED", async () => {
+      const { status } = await request(app).post(basicUrl).send(product);
+      status.should.be.equal(401);
+    });
+    it("test 201 for insert product", async () => {
+      const { body, status } = await request(app)
+      .post(basicUrl)
+      .send(product)
+      .set({ authorization: token });
+      status.should.be.equal(201);
+      body.should.have.property("_id");
+      body.should.have.property("brand").equal(product.brand);
+      body.should.have.property("model").equal(product.model);
+      body.should.have.property("car_model_year").equal(product.car_model_year);
+      body.should.have.property("price").equal(product.price);
+      id = body._id;
+    });
+  });
 
-    describe.only('Add products', () => {
-        /* before(async () => {
-            const newUser = new userSchema({
-                name: user.name,
-                surname: user.surname,
-                email: user.email,
-                password: await bcrypt.hash(user.password, saltRounds),
-                verify: v4(),
-            });
-            await newUser.save();
-        }); */
-        after(async () => {
-            await productSchema.findOneAndDelete({ model: product.model });
-            /*  await userSchema.findOneAndDelete({ email: user.email }); */
-        });
-        it("test 400 missing brand", async () => {
-            const productWithoutBrand = { ...product } as any;
-            delete productWithoutBrand.brand;
-            const { status } = await request(app)
-                .post(`${baseAuth}/products`)
-                .send(productWithoutBrand);
-            status.should.be.equal(400);
-        });
-        it("test 400 missing model", async () => {
-            const productWithoutmModel = { ...product } as any;
-            delete productWithoutmModel.model;
-            const { status } = await request(app)
-                .post(`${baseAuth}/products`)
-                .send(productWithoutmModel);
-            status.should.be.equal(400);
-        });
-        it("test 400 missing car_model_year", async () => {
-            const productWithoutmYear = { ...product } as any;
-            delete productWithoutmYear.car_model_year;
-            const { status } = await request(app)
-                .post(`${baseAuth}/products`)
-                .send(productWithoutmYear);
-            status.should.be.equal(400);
-        });
-        it("test 400 missing price", async () => {
-            const productWithoutmPrice = { ...product } as any;
-            delete productWithoutmPrice.price;
-            const { status } = await request(app)
-                .post(`${baseAuth}/products`)
-                .send(productWithoutmPrice);
-            status.should.be.equal(400);
-        });
-        it("test 201 for insert product", async () => {
-            const { body, status } = await request(app)
-                .post(`${baseAuth}/products`)
-                .send({product, _id: "Product Inserted"});
-            status.should.be.equal(201);
-            body.should.have.property("_id");
-            body.should.have.property("brand").equal(product.brand);
-            body.should.have.property("model").equal(product.model);
-            body.should.have.property("car_model_year").equal(product.car_model_year);
-            body.should.have.property("price").equal(product.price);
-        });
-    })
+  describe("Update products", () => {
+    let id: string;
+    const newBrand = "Nissan";
+    before(async () => {
+      const p = await Product.create(product);
+      id = p._id.toString();
+    });
+    after(async () => {
+      await Product.findByIdAndDelete(id);
+    });
+    it("test failed 401", async () => {
+      const { status } = await request(app)
+        .put(`${basicUrl}/${id}`)
+        .send({ ...product, brand: newBrand });
+      status.should.be.equal(401);
+    });
+    it("test success 200", async () => {
+      const { status, body } = await request(app)
+        .put(`${basicUrl}/${id}`)
+        .send({ ...product, brand: newBrand })
+        .set({ authorization: token });
+      status.should.be.equal(200);
+      body.should.have.property("_id");
+      body.should.have.property("brand").equal(newBrand);
+      body.should.have.property("model").equal(product.model);
+      body.should.have.property("car_model_year").equal(product.car_model_year);
+      body.should.have.property("price").equal(product.price);
+    });
+    it("test unsuccess 404 not valid mongoId", async () => {
+      const fakeId = "a" + id.substring(1);
+      const { status } = await request(app)
+        .put(`${basicUrl}/${fakeId}`)
+        .send({ ...product, brand: newBrand })
+        .set({ authorization: token });
+      status.should.be.equal(404);
+    });
+    it("test 400 missing brand", async () => {
+      const fakeProduct = { ...product } as any;
+      delete fakeProduct.brand;
+      const { status } = await request(app)
+        .post(`${basicUrl}/${id}`)
+        .send(fakeProduct)
+        .set({ authorization: token });
+      status.should.be.equal(400);
+    });
+    it("test 400 missing model", async () => {
+      const fakeProduct = { ...product } as any;
+      delete fakeProduct.model;
+      const { status } = await request(app)
+        .post(`${basicUrl}/${id}`)
+        .send(fakeProduct)
+        .set({ authorization: token });
+      status.should.be.equal(400);
+    });
+    it("test 400 missing car_model_year", async () => {
+      const fakeProduct = { ...product } as any;
+      delete fakeProduct.car_model_year;
+      const { status } = await request(app)
+        .post(`${basicUrl}/${id}`)
+        .send(fakeProduct)
+        .set({ authorization: token });
+      status.should.be.equal(400);
+    });
+    it("test 400 price not number", async () => {
+      const fakeProduct = { ...product } as any;
+      fakeProduct.price = "pippo";
+      const { status } = await request(app)
+        .put(`${basicUrl}/${id}`)
+        .send(fakeProduct)
+        .set({ authorization: token });
+      status.should.be.equal(400);
+    });
+  });
 
-    describe('Put products', () => {
-        before(async () => {
-            const newProduct = new productSchema({
-                _id: product._id,
-                brand: product.brand,
-                model: product.model,
-                car_model_year: product.car_model_year,
-                price: product.price
-            });
-            await newProduct.save()
-        });
-        after(async () => {
-            await productSchema.findOneAndDelete({ _id: product._id });
-        });
-        it("test 404 product not found", async () => {
-            await productSchema.findById({_id: product._id})
-            const { status } = await request(app)
-                .put(`${baseAuth}/products/:${product._id}`)
-                .send({_id: "product does not exist" });
-            status.should.be.equal(404);
-        })
-        it("test 201 product updated", async () => {
-            await productSchema.findByIdAndUpdate(product._id,
-                { brand: product.brand, model: product.model, car_model_year: product.car_model_year, price: product.price })
-            const { body, status } = await request(app)
-                .put(`${baseAuth}/products/:${product._id}`)
-                .send({ _id: "product update" });
-            status.should.be.equal(201);
-            body.should.have.property("brand").equal(product.brand);
-            body.should.have.property("model").equal(product.model);
-            body.should.have.property("car_model_year").equal(product.car_model_year);
-            body.should.have.property("price").equal(product.price);
-        })
-    })
+  describe("Delete products", () => {
+    let id: string;
+    before(async () => {
+      const p = await Product.create(product);
+      id = p._id.toString();
+    });
+    it("test failed 401", async () => {
+      const { status } = await request(app).delete(`${basicUrl}/${id}`);
+      status.should.be.equal(401);
+    });
+    it("test success 200", async () => {
+      const { status } = await request(app)
+        .delete(`${basicUrl}/${id}`)
+        .set({ authorization: token });
+      status.should.be.equal(200);
+    });
+  });
 
-    describe('Delete products', () => {
-        before(async () => {
-            const newProduct = new productSchema({
-                _id: product._id,
-                brand: product.brand,
-                model: product.model,
-                car_model_year: product.car_model_year,
-                price: product.price
-            });
-            await newProduct.save()
-        });
-/*         after(async () => {
-            await productSchema.findOneAndDelete({ _id: product._id });
-        }); */
-        it("test 404 product not found", async () => {
-            await productSchema.findById({_id: product._id})
-            const { status } = await request(app)
-                .delete(`${baseAuth}/products/:${product._id}`)
-                .send({_id: "product does not exist" });
-            status.should.be.equal(404);
-        })
-        it("test 201 product delete", async () => {
-            await productSchema.findByIdAndDelete(product._id);
-            const { body, status } = await request(app)
-                .delete(`${baseAuth}/products/:${product._id}`)
-                .send({_id:"Product delete"});
-            status.should.be.equal(201);
-            body.should.have.property("brand").equal(product.brand);
-            body.should.have.property("model").equal(product.model);
-            body.should.have.property("car_model_year").equal(product.car_model_year);
-            body.should.have.property("price").equal(product.price);
-        })
-    })
+  describe("get product", () => {
+    let id: string;
+    before(async () => {
+      const p = await Product.create(product);
+      id = p._id.toString();
+    });
+    after(async () => {
+      await Product.findByIdAndDelete(id);
+    });
+    it("test success 200", async () => {
+      const { status, body } = await request(app).get(`${basicUrl}/${id}`);
+      status.should.be.equal(200);
+      body.should.have.property("_id").equal(id);
+      body.should.have.property("brand").equal(product.brand);
+      body.should.have.property("model").equal(product.model);
+      body.should.have.property("car_model_year").equal(product.car_model_year);
+      body.should.have.property("price").equal(product.price);
+    });
+    it("test unsuccess 404 not valid mongoId", async () => {
+      const fakeId = "a" + id.substring(1);
+      const { status } = await request(app).get(`${basicUrl}/${fakeId}`);
+      status.should.be.equal(404);
+    });
+  });
 
-})
+  describe("get products", () => {
+    let ids: string[] = [];
+    const products = [
+      {
+        brand: "Nissan",
+        model: "Juke",
+        car_model_year: 2020,
+        price: 25000,
+      },
+      {
+        brand: "Alfa Romeo",
+        model: "Giulietta",
+        car_model_year: 2012,
+        price: 10000,
+      },
+      {
+        brand: "Alfa Romeo",
+        model: "Giulia",
+        car_model_year:2018,
+        price: 30000,
+      },
+    ];
+    before(async () => {
+      const response = await Promise.all([
+        Product.create(products[0]),
+        Product.create(products[1]),
+        Product.create(products[2]),
+      ]);
+      ids = response.map((item) => item._id.toString());
+    });
+    after(async () => {
+      await Promise.all([
+        Product.findByIdAndDelete(ids[0]),
+        Product.findByIdAndDelete(ids[1]),
+        Product.findByIdAndDelete(ids[2]),
+      ]);
+    });
+
+    it("test success 200", async () => {
+      const { status, body } = await request(app).get(basicUrl);
+      status.should.be.equal(200);
+      body.should.have.property("length").equal(products.length);
+    });
+
+    it("test success 200 with query params", async () => {
+      const { status, body } = await request(app).get(
+        `${basicUrl}?brand=Nissan`
+      );
+      status.should.be.equal(200);
+      body.should.have.property("length").equal(1);
+    });
+  });
+});

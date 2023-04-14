@@ -6,7 +6,7 @@
   "scripts": {
     "build": "tsc",
     "start": "set DB=stage && npm run build && node ./build/app.js",
-    "test": "set DB=test && npm run build && mocha ./build/tests/*.js"
+    "test": "set DB=test && npm run build && mocha --timeout 10000 ./build/tests/*.js"
   },
   "keywords": [],
   "author": "",

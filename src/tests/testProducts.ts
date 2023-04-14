@@ -2,7 +2,7 @@ import request from "supertest";
 require("chai").should();
 import bcrypt from "bcrypt";
 import { app } from "../app";
-import { Product} from "../models/productSchema";
+import { Product } from "../models/productSchema";
 import { User as userSchema } from "../models/user";
 import { saltRounds } from "../routes/auth";
 import jwt from "jsonwebtoken";
@@ -47,7 +47,7 @@ describe("products", () => {
     await userSchema.findOneAndDelete({ email: user.email });
   });
 
-  describe.only("create product", () => {
+  describe("create product", () => {
     let id: string;
     after(async () => {
       await Product.findByIdAndDelete(id);
@@ -56,11 +56,47 @@ describe("products", () => {
       const { status } = await request(app).post(basicUrl).send(product);
       status.should.be.equal(401);
     });
+    it("test 400 missing brand", async () => {
+      const fakeProduct = { ...product } as any;
+      delete fakeProduct.brand;
+      const { status } = await request(app)
+        .post(`${basicUrl}`)
+        .send(fakeProduct)
+        .set({ authorization: token });
+      status.should.be.equal(400);
+    });
+    it("test 400 missing model", async () => {
+      const fakeProduct = { ...product } as any;
+      delete fakeProduct.model;
+      const { status } = await request(app)
+        .post(`${basicUrl}`)
+        .send(fakeProduct)
+        .set({ authorization: token });
+      status.should.be.equal(400);
+    });
+    it("test 400 car_model_year not number", async () => {
+      const fakeProduct = { ...product } as any;
+      fakeProduct.price = "pippo";
+      const { status } = await request(app)
+        .post(`${basicUrl}`)
+        .send(fakeProduct)
+        .set({ authorization: token });
+      status.should.be.equal(400);
+    });
+    it("test 400 price not number", async () => {
+      const fakeProduct = { ...product } as any;
+      fakeProduct.price = "pippo";
+      const { status } = await request(app)
+        .post(`${basicUrl}`)
+        .send({ fakeProduct })
+        .set({ authorization: token });
+      status.should.be.equal(400);
+    });
     it("test 201 for insert product", async () => {
       const { body, status } = await request(app)
-      .post(basicUrl)
-      .send(product)
-      .set({ authorization: token });
+        .post(basicUrl)
+        .send({ message: "Product inserted", product })
+        .set({ authorization: token });
       status.should.be.equal(201);
       body.should.have.property("_id");
       body.should.have.property("brand").equal(product.brand);
@@ -90,7 +126,11 @@ describe("products", () => {
     it("test success 200", async () => {
       const { status, body } = await request(app)
         .put(`${basicUrl}/${id}`)
-        .send({ ...product, brand: newBrand })
+        .send({
+          message: "product updated",
+          ...product,
+          brand: newBrand,
+        })
         .set({ authorization: token });
       status.should.be.equal(200);
       body.should.have.property("_id");
@@ -106,42 +146,6 @@ describe("products", () => {
         .send({ ...product, brand: newBrand })
         .set({ authorization: token });
       status.should.be.equal(404);
-    });
-    it("test 400 missing brand", async () => {
-      const fakeProduct = { ...product } as any;
-      delete fakeProduct.brand;
-      const { status } = await request(app)
-        .post(`${basicUrl}/${id}`)
-        .send(fakeProduct)
-        .set({ authorization: token });
-      status.should.be.equal(400);
-    });
-    it("test 400 missing model", async () => {
-      const fakeProduct = { ...product } as any;
-      delete fakeProduct.model;
-      const { status } = await request(app)
-        .post(`${basicUrl}/${id}`)
-        .send(fakeProduct)
-        .set({ authorization: token });
-      status.should.be.equal(400);
-    });
-    it("test 400 missing car_model_year", async () => {
-      const fakeProduct = { ...product } as any;
-      delete fakeProduct.car_model_year;
-      const { status } = await request(app)
-        .post(`${basicUrl}/${id}`)
-        .send(fakeProduct)
-        .set({ authorization: token });
-      status.should.be.equal(400);
-    });
-    it("test 400 price not number", async () => {
-      const fakeProduct = { ...product } as any;
-      fakeProduct.price = "pippo";
-      const { status } = await request(app)
-        .put(`${basicUrl}/${id}`)
-        .send(fakeProduct)
-        .set({ authorization: token });
-      status.should.be.equal(400);
     });
   });
 
@@ -206,7 +210,7 @@ describe("products", () => {
       {
         brand: "Alfa Romeo",
         model: "Giulia",
-        car_model_year:2018,
+        car_model_year: 2018,
         price: 30000,
       },
     ];

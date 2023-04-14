@@ -48,23 +48,27 @@ router.put(
   async (req, res) => {
     const { id } = req.params;
     const { brand, model, car_model_year, price } = req.body;
-    const productFinder = await Product.findByIdAndUpdate(id, {
-      brand: brand,
-      model: model,
-      car_model_year: car_model_year,
-      price: price,
-    });
-    if (!productFinder) {
-      return res.status(404).json({ message: "product not found" });
-    } else {
-      const product = new Product({
-        brand,
-        model,
-        car_model_year,
-        price,
+    try {
+      const productFinder = await Product.findByIdAndUpdate(id, {
+        brand: brand,
+        model: model,
+        car_model_year: car_model_year,
+        price: price,
       });
-      //Edit document to collection
-      res.status(201).json({ message: "product updated", product });
+      if (!productFinder) {
+        return res.status(404).json({ message: "product not found" });
+      } else {
+        const product = new Product({
+          brand,
+          model,
+          car_model_year,
+          price,
+        });
+        //Edit document to collection
+        res.status(200).json({ message: "product updated", product });
+      }
+    } catch (err) {
+      res.status(500).json({ err });
     }
   }
 );
@@ -79,7 +83,7 @@ router.delete(
     const { id } = req.params;
     const productDeleted = await Product.findByIdAndDelete(id);
     productDeleted
-      ? res.status(201).json({ message: "product delete", productDeleted })
+      ? res.status(200).json({ message: "product delete", productDeleted })
       : res.status(404).json({ message: "product not found" });
   }
 );

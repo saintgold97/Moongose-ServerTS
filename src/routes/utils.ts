@@ -31,6 +31,7 @@ export const isAuth = async (
   const user = jwt.verify(auth, jwtToken) as { id: string };
   res.locals.userFinded = await User.findById(user.id);
   if (res.locals.userFinded) {
+    console.log("userFinded",res.locals.userFinded)
     return next();
   } else {
     return res.status(400).json({ message: "token not valid" });

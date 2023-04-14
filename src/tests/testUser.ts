@@ -159,7 +159,7 @@ describe("auth", () => {
     after(async() => {
       await userSchema.findOneAndDelete({email:user.email})
     });
-    it("test 200 token wrong", async () => {
+    it("test 400 token wrong", async () => {
       const { status } = await request(app)
         .get(`${baseAuth}/me`)
         .set({ authorization: "wrong-token" });

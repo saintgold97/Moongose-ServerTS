@@ -24,10 +24,7 @@ router.post(
     });
     //Adds document to collection
     const productSaved = await product.save();
-    res.status(201).json({
-      message: "Product Inserted",
-      productSaved,
-    });
+    res.status(201).json(product);
   }
 );
 

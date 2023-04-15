@@ -11,9 +11,9 @@ const baseAuth = "/v1/auth";
 
 describe("auth", () => {
   const user = {
-    name: "Carlo",
-    surname: "Leonardi",
-    email: "carloleonard83@gmail.com",
+    name: "Roberto",
+    surname: "Santoro",
+    email: "rob@outlook.it",
     password: "testtest",
   };
 
@@ -48,6 +48,7 @@ describe("auth", () => {
       const { body, status } = await request(app)
       .post(`${baseAuth}/signup`)
       .send(user);
+      console.log(user.email)
       status.should.be.equal(201);
       body.should.have.property("id");
       body.should.have.property("name").equal(user.name);
@@ -154,16 +155,16 @@ describe("auth", () => {
         email: user.email,
         password: await bcrypt.hash(user.password, saltRounds),
       });
-      newUser.save();
+      await newUser.save();
     });
     after(async() => {
       await userSchema.findOneAndDelete({email:user.email})
     });
-    it("test 400 token wrong", async () => {
+    it("test 401 token wrong", async () => {
       const { status } = await request(app)
         .get(`${baseAuth}/me`)
-        .set({ authorization: "wrong-token" });
-      status.should.be.equal(400);
+        .set("authorization", "wrong-token");
+      status.should.be.equal(401);
     });
     it("test 200 token rigth", async () => {
       const {

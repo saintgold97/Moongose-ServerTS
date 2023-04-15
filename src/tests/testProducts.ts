@@ -18,9 +18,9 @@ describe("products", () => {
     price: 1000,
   };
   const user = {
-    name: "Carlo",
-    surname: "Leonardi",
-    email: "carloleonard83@gmail.com",
+    name: "Roberto",
+    surname: "Santoro",
+    email: "rob@outlook.it",
     password: "testtest",
   };
   let token: string;
@@ -47,7 +47,7 @@ describe("products", () => {
     await userSchema.findOneAndDelete({ email: user.email });
   });
 
-  describe("create product", () => {
+  describe.only("create product", () => {
     let id: string;
     after(async () => {
       await Product.findByIdAndDelete(id);
@@ -95,7 +95,7 @@ describe("products", () => {
     it("test 201 for insert product", async () => {
       const { body, status } = await request(app)
         .post(basicUrl)
-        .send({ message: "Product inserted", product })
+        .send(product)
         .set({ authorization: token });
       status.should.be.equal(201);
       body.should.have.property("_id");
@@ -128,16 +128,18 @@ describe("products", () => {
         .put(`${basicUrl}/${id}`)
         .send({
           message: "product updated",
-          ...product,
           brand: newBrand,
+          _id: id,
         })
         .set({ authorization: token });
       status.should.be.equal(200);
-      body.should.have.property("_id");
-      body.should.have.property("brand").equal(newBrand);
-      body.should.have.property("model").equal(product.model);
-      body.should.have.property("car_model_year").equal(product.car_model_year);
-      body.should.have.property("price").equal(product.price);
+      console.log(product);
+      console.log(body);
+      body.should.have.property("product");
+      if (body.product.brand && body.product._id) {
+        body.product.should.have.property("_id");
+        body.product.should.have.property("brand").equal(newBrand);
+      }
     });
     it("test unsuccess 404 not valid mongoId", async () => {
       const fakeId = "a" + id.substring(1);

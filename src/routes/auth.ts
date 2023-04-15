@@ -43,7 +43,6 @@ router.post(
         email: user.email,
       });
     } catch (e) {
-      console.log(e);
       return res.status(409).json({ message: "Email is just present" });
     }
   }

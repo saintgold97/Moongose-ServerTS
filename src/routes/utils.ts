@@ -28,12 +28,19 @@ export const isAuth = async (
   next: NextFunction
 ) => {
   const auth = headers.authorization as string;
-  const user = jwt.verify(auth, jwtToken) as { id: string };
-  res.locals.userFinded = await User.findById(user.id);
-  if (res.locals.userFinded) {
-    console.log("userFinded",res.locals.userFinded)
-    return next();
-  } else {
-    return res.status(400).json({ message: "token not valid" });
+  try {
+    const decodedToken = jwt.verify(auth, jwtToken) as { id: string };
+    const user = await User.findById(decodedToken.id);
+    if (user) {
+      res.locals.userFinded = user;
+      return next();
+    } else {
+      return res.status(401).json({ message: "Invalid token" });
+    }
+  } catch (error) {
+    if (error instanceof jwt.JsonWebTokenError) {
+      return res.status(401).json({ message: "Invalid token" });
+    }
+    return res.status(500).json({ message: "Internal server error" });
   }
 };
